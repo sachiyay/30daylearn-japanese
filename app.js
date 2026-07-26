@@ -344,14 +344,25 @@ function renderQuizQuestion() {
     const btn = document.createElement("button");
     btn.className = "choice-btn";
     btn.textContent = choice;
-    btn.addEventListener("click", () => selectAnswer(btn, choice, q.answer));
+    btn.addEventListener("click", () => selectAnswer(btn, choice, q.answer, q.question));
     choicesEl.appendChild(btn);
   });
 }
 
 const QUIZ_BEAT_MS = 400; // short pause after feedback (and any audio) before advancing
 
-function selectAnswer(btn, choice, answer) {
+// "How do you say X?" questions have Japanese romaji as the choices, so the
+// clicked choice itself maps to a word. "What does 'Y' mean?" questions have
+// English choices instead — for those, the word being tested is quoted in
+// the question text itself, so pull it from there.
+function jpForAnswer(choice, questionText) {
+  if (ROMAJI_TO_JP[choice]) return ROMAJI_TO_JP[choice];
+  const match = questionText.match(/'([^']+)'/);
+  if (match && ROMAJI_TO_JP[match[1]]) return ROMAJI_TO_JP[match[1]];
+  return null;
+}
+
+function selectAnswer(btn, choice, answer, questionText) {
   const choicesEl = document.getElementById("quiz-choices");
   // Lock the question the instant an answer is picked, so a fast second click
   // can't register before the next question loads.
@@ -372,7 +383,7 @@ function selectAnswer(btn, choice, answer) {
     }, QUIZ_BEAT_MS);
   };
 
-  const jp = ROMAJI_TO_JP[choice];
+  const jp = jpForAnswer(choice, questionText);
   if (jp) {
     speak(jp, advance); // wait for the actual pronunciation to finish, then beat, then advance
   } else {

@@ -566,7 +566,7 @@ const CURRICULUM = [
     ],
     quiz: [
       { question: "How do you say 'I am Wes'?", choices: ["Watashi wa Wesu desu.", "Nihongo wo benkyou shiteimasu.", "Mata ashita!", "Musuko ga daisuki desu."], answer: "Watashi wa Wesu desu." },
-      { question: "What does 'Nihongo wo benkyou shiteimasu' mean?", choices: ["I love my son", "I am studying Japanese", "I did my best", "See you tomorrow"], answer: "I am studying Japanese" },
+      { question: "What does 'Nihongo wo benkyou shiteimasu.' mean?", choices: ["I love my son", "I am studying Japanese", "I did my best", "See you tomorrow"], answer: "I am studying Japanese" },
       { question: "How do you say 'I love my son'?", choices: ["Musuko ga daisuki desu.", "Watashi wa Wesu desu.", "Ganbarimashita!", "Mata ashita!"], answer: "Musuko ga daisuki desu." },
       { question: "What does 'Ganbarimashita!' mean?", choices: ["See you tomorrow!", "I did my best!", "I am Wes", "I love my son"], answer: "I did my best!" },
       { question: "How do you say 'See you tomorrow!'?", choices: ["Mata ashita!", "Ganbarimashita!", "Nihongo wo benkyou shiteimasu.", "Watashi wa Wesu desu."], answer: "Mata ashita!" },
