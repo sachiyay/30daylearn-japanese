@@ -9,6 +9,7 @@ const SHIBA_STAGES = [
   { emoji: "🐕‍🦺", label: "Young Adult" },
   { emoji: "🎌🐕", label: "Full-Grown Shiba" },
 ];
+const DAYS_PER_STAGE = 5;
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -39,8 +40,21 @@ function todayStr() {
 }
 
 function stageForCompletedCount(count) {
-  const idx = Math.min(SHIBA_STAGES.length - 1, Math.floor(count / 5));
+  const idx = Math.min(SHIBA_STAGES.length - 1, Math.floor(count / DAYS_PER_STAGE));
   return SHIBA_STAGES[idx];
+}
+
+// Progress toward the next stage, for the dashboard's progress bar — moves
+// forward with every newly completed lesson, even between actual stage
+// changes, so there's always some visible feedback. Returns null once the
+// final stage is reached.
+function nextStageProgress(count) {
+  const idx = Math.min(SHIBA_STAGES.length - 1, Math.floor(count / DAYS_PER_STAGE));
+  if (idx >= SHIBA_STAGES.length - 1) return null;
+  const next = SHIBA_STAGES[idx + 1];
+  const daysIntoStage = count - idx * DAYS_PER_STAGE;
+  const pct = Math.min(100, Math.round((daysIntoStage / DAYS_PER_STAGE) * 100));
+  return { next, pct, daysToGo: DAYS_PER_STAGE - daysIntoStage };
 }
 
 function showView(id) {
@@ -92,18 +106,20 @@ function renderTopNav() {
   const stage = stageForCompletedCount(state.completedDays.length);
   document.getElementById("home-shiba-emoji").textContent = stage.emoji;
   document.getElementById("home-shiba-name").textContent = state.shibaName || "";
+  document.getElementById("streak-count").textContent = `${state.streak} day streak`;
 }
 
 function renderNameSection() {
-  const displayRow = document.getElementById("name-display-row");
   const editRow = document.getElementById("name-edit-row");
+
+  const titleText = `${state.shibaName || "Shiba"}'s 30 Day Japanese Lesson`;
+  document.getElementById("page-title").textContent = titleText;
+  document.title = titleText;
+
   if (state.shibaName) {
-    document.getElementById("shiba-name-display").textContent = state.shibaName;
-    displayRow.classList.remove("hidden");
     editRow.classList.add("hidden");
   } else {
-    // No name yet — prompt for one right away instead of showing an empty display row.
-    displayRow.classList.add("hidden");
+    // No name yet — prompt for one right away instead of leaving it blank.
     editRow.classList.remove("hidden");
   }
 }
@@ -113,7 +129,18 @@ function renderDashboard() {
   document.getElementById("shiba-stage").textContent = stage.emoji;
   document.getElementById("day-progress").textContent =
     `Day ${Math.min(state.currentDay, TOTAL_DAYS)} of ${TOTAL_DAYS} — ${stage.label}`;
-  document.getElementById("streak-display").textContent = `🔥 ${state.streak} day streak`;
+
+  // Bar fill reflects the whole 30-day journey; the label underneath still
+  // counts down to the next character stage specifically.
+  const overallPct = Math.min(100, Math.round((state.completedDays.length / TOTAL_DAYS) * 100));
+  const barFill = document.getElementById("xp-bar-fill");
+  const barLabel = document.getElementById("xp-bar-label");
+  barFill.style.width = `${overallPct}%`;
+
+  const progress = nextStageProgress(state.completedDays.length);
+  barLabel.textContent = progress
+    ? `${progress.daysToGo} lesson${progress.daysToGo === 1 ? "" : "s"} to go until ${progress.next.label}`
+    : "Max stage reached!";
 
   const btn = document.getElementById("btn-start-lesson");
   const dayData = CURRICULUM.find((d) => d.day === state.currentDay);
@@ -132,7 +159,7 @@ function renderPracticeList() {
 
   const completedLessons = state.completedDays
     .slice()
-    .sort((a, b) => a - b)
+    .sort((a, b) => b - a)
     .map((day) => CURRICULUM.find((d) => d.day === day))
     .filter(Boolean);
 
@@ -145,7 +172,7 @@ function renderPracticeList() {
   completedLessons.forEach((dayData) => {
     const btn = document.createElement("button");
     btn.className = "practice-btn";
-    btn.textContent = `Practice: ${dayData.title}`;
+    btn.textContent = dayData.title;
     btn.addEventListener("click", () => {
       renderLesson(dayData);
       showView("view-lesson");
@@ -287,14 +314,19 @@ document.getElementById("btn-home").addEventListener("click", () => {
 });
 
 document.getElementById("btn-rename").addEventListener("click", () => {
-  document.getElementById("shiba-name-input").value = state.shibaName || "";
-  document.getElementById("name-display-row").classList.add("hidden");
+  // The pencil lives in the global header now, so make sure the rename field
+  // it opens is actually visible regardless of which screen it was clicked from.
+  renderDashboard();
+  showView("view-dashboard");
+  const input = document.getElementById("shiba-name-input");
+  input.value = state.shibaName || "";
   document.getElementById("name-edit-row").classList.remove("hidden");
+  input.focus();
 });
 
 document.getElementById("btn-save-name").addEventListener("click", () => {
   const input = document.getElementById("shiba-name-input");
-  const name = input.value.trim();
+  const name = input.value.trim().slice(0, 20);
   if (!name) return;
   state.shibaName = name;
   saveState(state);

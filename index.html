@@ -9,29 +9,34 @@
 <body>
 
 <header id="top-nav">
-  <button id="btn-home" title="Back to Shiba home">
-    <span id="home-shiba-emoji">🥚</span>
-    <span id="home-shiba-name"></span>
-  </button>
+  <div id="home-group">
+    <button id="btn-home" title="Back to Shiba home">
+      <span id="home-shiba-emoji">🥚</span>
+      <span id="home-shiba-name"></span>
+    </button>
+    <button id="btn-rename" title="Rename your Shiba">✏️</button>
+  </div>
+  <div id="streak-badge">🔥 <span id="streak-count">0</span></div>
 </header>
 
 <main id="app">
 
   <section id="view-dashboard" class="view">
-    <h1>Shiba's 30 Day Japanese Lesson</h1>
+    <h1 id="page-title">Shiba's 30 Day Japanese Lesson</h1>
     <div id="shiba-stage" class="shiba"></div>
 
-    <div id="name-display-row">
-      <span id="shiba-name-display"></span>
-      <button id="btn-rename" title="Rename your Shiba">✏️</button>
-    </div>
     <div id="name-edit-row" class="hidden">
       <input id="shiba-name-input" type="text" maxlength="20" placeholder="Name your Shiba">
       <button id="btn-save-name">Save Name</button>
     </div>
 
     <p id="day-progress"></p>
-    <p id="streak-display"></p>
+
+    <div id="xp-bar-track">
+      <div id="xp-bar-fill"></div>
+    </div>
+    <p id="xp-bar-label"></p>
+
     <button id="btn-start-lesson">Start Today's Lesson</button>
 
     <div id="practice-section" class="hidden">
