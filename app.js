@@ -24,6 +24,15 @@ let state = loadState();
 let quiz = { dayData: null, index: 0, score: 0 };
 let activeDayData = null; // whichever day's lesson is currently on screen
 
+// Quiz choices are romaji-only, but pronunciation needs actual kana — build a
+// romaji -> kana lookup from every day's word list so we know what to speak.
+const ROMAJI_TO_JP = {};
+CURRICULUM.forEach((day) => {
+  day.words.forEach((w) => {
+    ROMAJI_TO_JP[w.romaji] = w.jp;
+  });
+});
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -38,10 +47,31 @@ function showView(id) {
   document.getElementById(id).classList.remove("hidden");
 }
 
+// Available voices load asynchronously in most browsers, so cache them once
+// ready rather than querying getVoices() fresh (and often empty) every call.
+let cachedVoices = [];
+if ("speechSynthesis" in window) {
+  const loadVoices = () => { cachedVoices = speechSynthesis.getVoices(); };
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function pickJapaneseVoice() {
+  const jaVoices = cachedVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith("ja"));
+  if (jaVoices.length === 0) return null;
+  // Prefer known higher-quality engines (Google's ja-JP voice in Chrome, or
+  // "Enhanced"/"Premium" voices on macOS/iOS) over the default robotic one.
+  const preferred = jaVoices.find((v) => /google|enhanced|premium|neural/i.test(v.name));
+  return preferred || jaVoices[0];
+}
+
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel(); // stop whatever's currently playing/queued first
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "ja-JP";
+  const voice = pickJapaneseVoice();
+  if (voice) utter.voice = voice;
   speechSynthesis.speak(utter);
 }
 
@@ -75,7 +105,7 @@ function renderDashboard() {
   const btn = document.getElementById("btn-start-lesson");
   const dayData = CURRICULUM.find((d) => d.day === state.currentDay);
   btn.disabled = !dayData;
-  btn.textContent = dayData ? "Start Today's Lesson" : "More lessons coming soon!";
+  btn.textContent = dayData ? `Start Day ${state.currentDay}'s Lesson` : "More lessons coming soon!";
 
   renderNameSection();
   renderPracticeList();
@@ -148,19 +178,32 @@ function renderQuizQuestion() {
     const btn = document.createElement("button");
     btn.className = "choice-btn";
     btn.textContent = choice;
-    btn.addEventListener("click", () => handleAnswer(choice, q.answer));
+    btn.addEventListener("click", () => selectAnswer(btn, choice, q.answer));
     choicesEl.appendChild(btn);
   });
 }
 
-function handleAnswer(choice, answer) {
-  if (choice === answer) quiz.score++;
-  quiz.index++;
-  if (quiz.index < quiz.dayData.quiz.length) {
-    renderQuizQuestion();
-  } else {
-    finishQuiz();
-  }
+function selectAnswer(btn, choice, answer) {
+  const choicesEl = document.getElementById("quiz-choices");
+  // Lock the question the instant an answer is picked, so a fast second click
+  // can't register during the 0.7s pause before the next question loads.
+  choicesEl.querySelectorAll(".choice-btn").forEach((b) => (b.disabled = true));
+
+  const isCorrect = choice === answer;
+  btn.classList.add(isCorrect ? "correct" : "incorrect");
+  if (isCorrect) quiz.score++;
+
+  const jp = ROMAJI_TO_JP[choice];
+  if (jp) speak(jp);
+
+  setTimeout(() => {
+    quiz.index++;
+    if (quiz.index < quiz.dayData.quiz.length) {
+      renderQuizQuestion();
+    } else {
+      finishQuiz();
+    }
+  }, 700);
 }
 
 function finishQuiz() {
