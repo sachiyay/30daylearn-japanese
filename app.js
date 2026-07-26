@@ -326,8 +326,23 @@ function renderLesson(dayData) {
   });
 }
 
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function startQuiz(dayData) {
-  quiz = { dayData, index: 0, score: 0 };
+  // Reshuffle question order and each question's answer choices every time,
+  // so first-time play and every repeat/practice session feel fresh.
+  const shuffledQuiz = shuffleArray(dayData.quiz).map((q) => ({
+    ...q,
+    choices: shuffleArray(q.choices),
+  }));
+  quiz = { dayData: { ...dayData, quiz: shuffledQuiz }, index: 0, score: 0 };
   renderQuizQuestion();
   showView("view-quiz");
 }
