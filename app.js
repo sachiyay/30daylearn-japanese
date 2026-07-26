@@ -21,6 +21,7 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+const isNewUser = localStorage.getItem(STORAGE_KEY) === null;
 let state = loadState();
 let quiz = { dayData: null, index: 0, score: 0 };
 let activeDayData = null; // whichever day's lesson is currently on screen
@@ -57,9 +58,119 @@ function nextStageProgress(count) {
   return { next, pct, daysToGo: DAYS_PER_STAGE - daysIntoStage };
 }
 
+// Elements waiting for the very first name-save before they reveal — set by
+// runWelcomeSequence, consumed by the btn-save-name handler.
+let pendingRevealEls = [];
+
+// First-visit-only: types out a welcome message in the egg's spot, then
+// crossfades it out as the egg + name field fade in to replace it. The rest
+// of the dashboard (progress bar, start-lesson button) stays hidden until
+// the user actually saves a name.
+function runWelcomeSequence() {
+  const line1 = "Welcome to your Japanese Lesson!";
+  const line2 = "Let's grow your shiba-inu as you play :)";
+  // "<br>" is kept as one whole token (never typed character-by-character),
+  // so it's inserted atomically and never briefly shows as literal text.
+  const tokens = [...line1.split(""), "<br>", ...line2.split("")];
+
+  const welcomeEl = document.getElementById("welcome-message");
+  const stageOneEls = [
+    document.getElementById("shiba-stage"),
+    document.getElementById("name-edit-row"),
+  ];
+  const stageTwoEls = [
+    document.getElementById("day-progress"),
+    document.getElementById("xp-bar-track"),
+    document.getElementById("xp-bar-label"),
+    document.getElementById("btn-start-lesson"),
+  ];
+
+  welcomeEl.classList.remove("hidden");
+  [...stageOneEls, ...stageTwoEls].forEach((el) => el.classList.add("reveal-hidden"));
+
+  let i = 0;
+  const typeSpeed = 70; // ms per character
+  const typer = setInterval(() => {
+    i++;
+    const shown = tokens.slice(0, i).join("");
+    welcomeEl.innerHTML = shown + (i < tokens.length ? "|" : "");
+    if (i >= tokens.length) clearInterval(typer);
+  }, typeSpeed);
+
+  const readPause = 2200; // time to actually read the finished message before it fades
+  setTimeout(() => {
+    welcomeEl.classList.add("reveal-hidden"); // fade the message out...
+    stageOneEls.forEach((el) => el.classList.remove("reveal-hidden")); // ...as the egg + name field fade in
+    pendingRevealEls = stageTwoEls; // held back until the name is actually saved
+  }, tokens.length * typeSpeed + readPause);
+}
+
 function showView(id) {
-  document.querySelectorAll(".view").forEach((el) => el.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
+  const current = document.querySelector(".view:not(.hidden)");
+  const next = document.getElementById(id);
+  if (current === next) return;
+
+  const activateNext = () => {
+    if (current) {
+      current.classList.add("hidden");
+      current.style.opacity = "";
+    }
+    next.classList.remove("hidden");
+    next.style.opacity = "0";
+    void next.offsetWidth; // force a reflow so the opacity change below actually transitions
+    next.style.opacity = "1";
+  };
+
+  if (current) {
+    current.style.opacity = "0";
+    setTimeout(activateNext, 180);
+  } else {
+    activateNext();
+  }
+}
+
+// Same fade-out-then-in used between full screens, but for swapping content
+// within a single element (e.g. one quiz question to the next).
+function fadeSwapContent(el, updateFn) {
+  el.style.opacity = "0";
+  setTimeout(() => {
+    updateFn();
+    void el.offsetWidth; // force a reflow so the opacity change below actually transitions
+    el.style.opacity = "1";
+  }, 180);
+}
+
+// Small celebratory burst, spawned from wherever the header's Shiba pill
+// actually sits (via getBoundingClientRect, so it's correct at any screen size).
+function celebrateConfetti() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const anchor = document.getElementById("btn-home");
+  const rect = anchor.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height / 2;
+
+  const colors = ["#e07a3f", "#66bb6a", "#42a5f5", "#ffca28", "#ec407a", "#ab47bc"];
+
+  for (let i = 0; i < 56; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = `${originX}px`;
+    piece.style.top = `${originY}px`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+    // Gravity-style arc: shoots up to a peak, then falls back down past the origin.
+    const dx = (Math.random() - 0.5) * 260;
+    const peakY = -(50 + Math.random() * 80);
+    const dy = 90 + Math.random() * 110;
+    piece.style.setProperty("--dx", `${dx}px`);
+    piece.style.setProperty("--peakY", `${peakY}px`);
+    piece.style.setProperty("--dy", `${dy}px`);
+    piece.style.animationDelay = `${Math.random() * 120}ms`;
+
+    document.body.appendChild(piece);
+    piece.addEventListener("animationend", () => piece.remove());
+  }
 }
 
 // Available voices load asynchronously in most browsers, so cache them once
@@ -112,9 +223,11 @@ function renderTopNav() {
 function renderNameSection() {
   const editRow = document.getElementById("name-edit-row");
 
-  const titleText = `${state.shibaName || "Shiba"}'s 30 Day Japanese Lesson`;
+  const shibaLabel = state.shibaName || "Shiba";
+  const titleText = `${shibaLabel}'s 30 Day Japanese Lesson`;
   document.getElementById("page-title").textContent = titleText;
   document.title = titleText;
+  document.getElementById("btn-to-dashboard").textContent = `Back to ${shibaLabel}`;
 
   if (state.shibaName) {
     editRow.classList.add("hidden");
@@ -248,7 +361,7 @@ function selectAnswer(btn, choice, answer) {
     setTimeout(() => {
       quiz.index++;
       if (quiz.index < quiz.dayData.quiz.length) {
-        renderQuizQuestion();
+        fadeSwapContent(document.getElementById("quiz-content"), renderQuizQuestion);
       } else {
         finishQuiz();
       }
@@ -290,10 +403,11 @@ function finishQuiz() {
   const stageAfter = stageForCompletedCount(state.completedDays.length);
   document.getElementById("results-score").textContent =
     `You got ${quiz.score}/${quiz.dayData.quiz.length} correct.`;
+  const shibaLabel = state.shibaName || "Shiba";
   document.getElementById("results-growth").textContent =
     stageAfter.label !== stageBefore.label
-      ? `Your Shiba grew into a ${stageAfter.label}! ${stageAfter.emoji}`
-      : "Keep going — your Shiba is getting closer to its next stage!";
+      ? `${shibaLabel} grew into a ${stageAfter.label}! ${stageAfter.emoji}`
+      : `Keep going — ${shibaLabel} is getting closer to its next stage!`;
 
   nextLessonDayData = CURRICULUM.find((d) => d.day === state.currentDay);
   const nextBtn = document.getElementById("btn-next-lesson");
@@ -332,6 +446,12 @@ document.getElementById("btn-save-name").addEventListener("click", () => {
   saveState(state);
   renderNameSection();
   renderTopNav();
+  celebrateConfetti();
+
+  if (pendingRevealEls.length) {
+    pendingRevealEls.forEach((el) => el.classList.remove("reveal-hidden"));
+    pendingRevealEls = [];
+  }
 });
 
 document.getElementById("btn-start-lesson").addEventListener("click", () => {
@@ -364,3 +484,7 @@ document.getElementById("btn-to-dashboard").addEventListener("click", () => {
 renderDashboard();
 renderTopNav();
 showView("view-dashboard");
+
+if (isNewUser) {
+  runWelcomeSequence();
+}

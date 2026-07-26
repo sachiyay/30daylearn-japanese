@@ -1,5 +1,34 @@
 * { box-sizing: border-box; }
 
+.confetti-piece {
+  position: fixed;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 999;
+  animation: confetti-burst 2s forwards;
+}
+
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+    animation-timing-function: ease-out; /* decelerate on the way up, like gravity slowing it */
+  }
+  40% {
+    transform: translate(calc(var(--dx) * 0.6), var(--peakY)) rotate(180deg);
+    animation-timing-function: ease-in; /* accelerate on the way down */
+  }
+  80% {
+    opacity: 1; /* stay fully visible through almost the whole flight */
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(360deg);
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -72,12 +101,13 @@ body {
 
 #name-edit-row {
   display: flex;
+  justify-content: center;
   gap: 8px;
   margin-bottom: 8px;
 }
 
 #shiba-name-input {
-  flex: 1;
+  flex: 0 0 50%;
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #f0d9c4;
@@ -102,12 +132,47 @@ body {
 
 .hidden { display: none !important; }
 
+.view { transition: opacity 0.2s ease; }
+#quiz-content { transition: opacity 0.2s ease; }
+
 h1, h2 { text-align: center; margin: 0 0 16px; }
+
+#intro-stage {
+  position: relative;
+  min-height: 120px;
+  margin: 16px 0;
+}
+
+/* Welcome message and the egg occupy the exact same spot, so fading one out
+   while the other fades in reads as one replacing the other in place. */
+#intro-stage > * {
+  position: absolute;
+  inset: 0;
+  margin: 0 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#welcome-message {
+  text-align: center;
+  font-size: 16px;
+  color: #6b4a3a;
+  font-style: italic;
+}
+
+.fade-target {
+  transition: opacity 1.8s ease, transform 1.8s ease;
+}
+
+.fade-target.reveal-hidden {
+  opacity: 0;
+  transform: translateY(8px);
+}
 
 .shiba {
   font-size: 96px;
-  text-align: center;
-  margin: 16px 0;
 }
 
 #day-progress {

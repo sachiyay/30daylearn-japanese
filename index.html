@@ -23,21 +23,24 @@
 
   <section id="view-dashboard" class="view">
     <h1 id="page-title">Shiba's 30 Day Japanese Lesson</h1>
-    <div id="shiba-stage" class="shiba"></div>
+    <div id="intro-stage">
+      <p id="welcome-message" class="hidden fade-target"></p>
+      <div id="shiba-stage" class="shiba fade-target"></div>
+    </div>
 
-    <div id="name-edit-row" class="hidden">
+    <div id="name-edit-row" class="hidden fade-target">
       <input id="shiba-name-input" type="text" maxlength="20" placeholder="Name your Shiba">
       <button id="btn-save-name">Save Name</button>
     </div>
 
-    <p id="day-progress"></p>
+    <p id="day-progress" class="fade-target"></p>
 
-    <div id="xp-bar-track">
+    <div id="xp-bar-track" class="fade-target">
       <div id="xp-bar-fill"></div>
     </div>
-    <p id="xp-bar-label"></p>
+    <p id="xp-bar-label" class="fade-target"></p>
 
-    <button id="btn-start-lesson">Start Today's Lesson</button>
+    <button id="btn-start-lesson" class="fade-target">Start Today's Lesson</button>
 
     <div id="practice-section" class="hidden">
       <h3>Practice a past lesson</h3>
@@ -53,9 +56,11 @@
 
   <section id="view-quiz" class="view hidden">
     <h2>Quiz</h2>
-    <p id="quiz-progress"></p>
-    <div id="quiz-question"></div>
-    <div id="quiz-choices"></div>
+    <div id="quiz-content">
+      <p id="quiz-progress"></p>
+      <div id="quiz-question"></div>
+      <div id="quiz-choices"></div>
+    </div>
   </section>
 
   <section id="view-results" class="view hidden">
