@@ -23,6 +23,7 @@ function saveState(state) {
 let state = loadState();
 let quiz = { dayData: null, index: 0, score: 0 };
 let activeDayData = null; // whichever day's lesson is currently on screen
+let nextLessonDayData = null; // the day offered by the results screen's "Continue" button
 
 // Quiz choices are romaji-only, but pronunciation needs actual kana — build a
 // romaji -> kana lookup from every day's word list so we know what to speak.
@@ -65,13 +66,25 @@ function pickJapaneseVoice() {
   return preferred || jaVoices[0];
 }
 
-function speak(text) {
-  if (!("speechSynthesis" in window)) return;
+// onDone (optional) fires once the audio actually finishes — used by the quiz
+// to wait for real playback length instead of guessing a fixed delay.
+function speak(text, onDone) {
+  if (!("speechSynthesis" in window)) {
+    if (onDone) onDone();
+    return;
+  }
   speechSynthesis.cancel(); // stop whatever's currently playing/queued first
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "ja-JP";
   const voice = pickJapaneseVoice();
   if (voice) utter.voice = voice;
+  if (onDone) {
+    let done = false;
+    const finish = () => { if (!done) { done = true; onDone(); } };
+    utter.onend = finish;
+    utter.onerror = finish;
+    setTimeout(finish, 4000); // safety net in case the browser never fires onend
+  }
   speechSynthesis.speak(utter);
 }
 
@@ -150,12 +163,21 @@ function renderLesson(dayData) {
     const card = document.createElement("div");
     card.className = "word-card";
     card.innerHTML = `
-      <span class="jp">${w.jp}</span>
       <span class="romaji">${w.romaji}</span>
+      <span class="jp">${w.jp}</span>
       <span class="en">${w.en}</span>
       <button class="speak-btn" aria-label="Play pronunciation">🔊</button>
     `;
-    card.querySelector(".speak-btn").addEventListener("click", () => speak(w.jp));
+    const speakBtn = card.querySelector(".speak-btn");
+    const romajiEl = card.querySelector(".romaji");
+    speakBtn.addEventListener("click", () => {
+      speakBtn.classList.add("playing");
+      romajiEl.classList.add("playing");
+      speak(w.jp, () => {
+        speakBtn.classList.remove("playing");
+        romajiEl.classList.remove("playing");
+      });
+    });
     container.appendChild(card);
   });
 }
@@ -183,27 +205,35 @@ function renderQuizQuestion() {
   });
 }
 
+const QUIZ_BEAT_MS = 400; // short pause after feedback (and any audio) before advancing
+
 function selectAnswer(btn, choice, answer) {
   const choicesEl = document.getElementById("quiz-choices");
   // Lock the question the instant an answer is picked, so a fast second click
-  // can't register during the 0.7s pause before the next question loads.
+  // can't register before the next question loads.
   choicesEl.querySelectorAll(".choice-btn").forEach((b) => (b.disabled = true));
 
   const isCorrect = choice === answer;
   btn.classList.add(isCorrect ? "correct" : "incorrect");
   if (isCorrect) quiz.score++;
 
-  const jp = ROMAJI_TO_JP[choice];
-  if (jp) speak(jp);
+  const advance = () => {
+    setTimeout(() => {
+      quiz.index++;
+      if (quiz.index < quiz.dayData.quiz.length) {
+        renderQuizQuestion();
+      } else {
+        finishQuiz();
+      }
+    }, QUIZ_BEAT_MS);
+  };
 
-  setTimeout(() => {
-    quiz.index++;
-    if (quiz.index < quiz.dayData.quiz.length) {
-      renderQuizQuestion();
-    } else {
-      finishQuiz();
-    }
-  }, 700);
+  const jp = ROMAJI_TO_JP[choice];
+  if (jp) {
+    speak(jp, advance); // wait for the actual pronunciation to finish, then beat, then advance
+  } else {
+    advance();
+  }
 }
 
 function finishQuiz() {
@@ -237,6 +267,15 @@ function finishQuiz() {
     stageAfter.label !== stageBefore.label
       ? `Your Shiba grew into a ${stageAfter.label}! ${stageAfter.emoji}`
       : "Keep going — your Shiba is getting closer to its next stage!";
+
+  nextLessonDayData = CURRICULUM.find((d) => d.day === state.currentDay);
+  const nextBtn = document.getElementById("btn-next-lesson");
+  if (nextLessonDayData) {
+    nextBtn.textContent = `Continue to Day ${nextLessonDayData.day}'s Lesson`;
+    nextBtn.classList.remove("hidden");
+  } else {
+    nextBtn.classList.add("hidden");
+  }
 
   renderTopNav();
   showView("view-results");
@@ -272,6 +311,12 @@ document.getElementById("btn-start-lesson").addEventListener("click", () => {
 
 document.getElementById("btn-to-quiz").addEventListener("click", () => {
   startQuiz(activeDayData);
+});
+
+document.getElementById("btn-next-lesson").addEventListener("click", () => {
+  if (!nextLessonDayData) return;
+  renderLesson(nextLessonDayData);
+  showView("view-lesson");
 });
 
 document.getElementById("btn-repeat-lesson").addEventListener("click", () => {
