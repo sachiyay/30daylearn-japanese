@@ -140,12 +140,13 @@ function fadeSwapContent(el, updateFn) {
   }, 180);
 }
 
-// Small celebratory burst, spawned from wherever the header's Shiba pill
-// actually sits (via getBoundingClientRect, so it's correct at any screen size).
+// Celebratory burst, centered on the whole app box and scaled to its size
+// (via getBoundingClientRect) so it reads clearly on any screen, including
+// small mobile ones where the header pill alone was too small/cramped to notice.
 function celebrateConfetti() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-  const anchor = document.getElementById("btn-home");
+  const anchor = document.getElementById("app");
   const rect = anchor.getBoundingClientRect();
   const originX = rect.left + rect.width / 2;
   const originY = rect.top + rect.height / 2;
@@ -160,9 +161,10 @@ function celebrateConfetti() {
     piece.style.background = colors[Math.floor(Math.random() * colors.length)];
 
     // Gravity-style arc: shoots up to a peak, then falls back down past the origin.
-    const dx = (Math.random() - 0.5) * 260;
-    const peakY = -(50 + Math.random() * 80);
-    const dy = 90 + Math.random() * 110;
+    // Spread is scaled to the box's own size so it covers it proportionally.
+    const dx = (Math.random() - 0.5) * rect.width * 0.9;
+    const peakY = -(rect.height * 0.12 + Math.random() * rect.height * 0.22);
+    const dy = rect.height * 0.22 + Math.random() * rect.height * 0.3;
     piece.style.setProperty("--dx", `${dx}px`);
     piece.style.setProperty("--peakY", `${peakY}px`);
     piece.style.setProperty("--dy", `${dy}px`);
@@ -310,7 +312,9 @@ function renderLesson(dayData) {
     `;
     const speakBtn = card.querySelector(".speak-btn");
     const romajiEl = card.querySelector(".romaji");
-    speakBtn.addEventListener("click", () => {
+    // Listen on the whole card (clicking the speaker icon still works too,
+    // since that click bubbles up to this same handler).
+    card.addEventListener("click", () => {
       speakBtn.classList.add("playing");
       romajiEl.classList.add("playing");
       speak(w.jp, () => {
