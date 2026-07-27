@@ -225,6 +225,11 @@ function playBuzzer(onDone) {
     return;
   }
   if (!audioCtx) audioCtx = new AudioCtxClass();
+  // iOS Safari (and some other mobile browsers) create AudioContext in a
+  // "suspended" state and need an explicit resume() inside a user-gesture
+  // handler before any sound will actually play — unlike speechSynthesis,
+  // which unlocks itself automatically, so this was silent on mobile.
+  if (audioCtx.state === "suspended") audioCtx.resume();
 
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -504,8 +509,11 @@ function finishQuiz() {
 // Bolds the key term in a review question — either the word in single-quotes
 // ("How do you say 'hello'?") or a bare number ("How do you say the number 6?").
 function boldQuoted(text) {
+  // Greedy match spans to the LAST quote in the string, not the first —
+  // otherwise a phrase with its own apostrophe (e.g. 'I'm sorry') would
+  // close early at that internal apostrophe and only bold "I".
   return text
-    .replace(/'([^']+)'/, "'<strong>$1</strong>'")
+    .replace(/'(.+)'/, "'<strong>$1</strong>'")
     .replace(/\b(\d+)\b/, "<strong>$1</strong>");
 }
 
