@@ -11,7 +11,7 @@
 <header id="top-nav">
   <div id="home-group">
     <button id="btn-home" title="Back to Shiba home">
-      <span id="home-shiba-emoji">🥚</span>
+      <img id="home-shiba-emoji" alt="Shiba">
       <span id="home-shiba-name"></span>
     </button>
     <button id="btn-rename" title="Rename your Shiba">✏️</button>
@@ -25,7 +25,7 @@
     <h1 id="page-title">Shiba's 30 Day Japanese Lesson</h1>
     <div id="intro-stage">
       <p id="welcome-message" class="hidden fade-target"></p>
-      <div id="shiba-stage" class="shiba fade-target"></div>
+      <img id="shiba-stage" class="shiba fade-target" alt="Shiba">
     </div>
 
     <div id="name-edit-row" class="hidden fade-target">
@@ -77,8 +77,16 @@
 
 </main>
 
+<div id="level-up-overlay" class="hidden">
+  <div id="level-up-backdrop"></div>
+  <div id="level-up-content">
+    <img id="level-up-image" alt="">
+    <p id="level-up-label"></p>
+  </div>
+</div>
+
 <a href="#" id="btn-start-over" class="text-link hidden">Start from the beginning</a>
-<p id="app-version">v2</p>
+<p id="app-version">v3</p>
 
 <script src="curriculum.js"></script>
 <script src="app.js"></script>

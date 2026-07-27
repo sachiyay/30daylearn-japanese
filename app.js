@@ -2,14 +2,19 @@ const STORAGE_KEY = "shiba-japanese-state";
 const TOTAL_DAYS = 30;
 
 const SHIBA_STAGES = [
-  { emoji: "🥚", label: "Egg" },
-  { emoji: "🐣", label: "Newborn Pup" },
-  { emoji: "🐕", label: "Puppy" },
-  { emoji: "🐕‍🦺", label: "Adolescent" },
-  { emoji: "🐕‍🦺", label: "Young Adult" },
-  { emoji: "🎌🐕", label: "Full-Grown Shiba" },
+  { image: "assets/shiba/shiba-01.png", label: "Egg" },
+  { image: "assets/shiba/shiba-02.png", label: "Hatching" },
+  { image: "assets/shiba/shiba-03.png", label: "Newborn Pup" },
+  { image: "assets/shiba/shiba-04.png", label: "Baby Pup" },
+  { image: "assets/shiba/shiba-05.png", label: "Puppy" },
+  { image: "assets/shiba/shiba-06.png", label: "Young Puppy" },
+  { image: "assets/shiba/shiba-07.png", label: "Juvenile" },
+  { image: "assets/shiba/shiba-08.png", label: "Adolescent" },
+  { image: "assets/shiba/shiba-09.png", label: "Young Adult" },
+  { image: "assets/shiba/shiba-10.png", label: "Adult" },
+  { image: "assets/shiba/shiba-11.png", label: "Full-Grown Shiba" },
 ];
-const DAYS_PER_STAGE = 5;
+const DAYS_PER_STAGE = 3;
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -175,6 +180,26 @@ function celebrateConfetti() {
   }
 }
 
+// Shows the new stage's artwork centered on screen with a bounce-in, holds
+// it briefly, then fades it away — used when the Shiba levels up.
+function showLevelUpReveal(stage) {
+  const overlay = document.getElementById("level-up-overlay");
+  document.getElementById("level-up-image").src = stage.image;
+  document.getElementById("level-up-label").textContent = stage.label;
+
+  overlay.classList.remove("hidden", "fading");
+  void overlay.offsetWidth; // force reflow so the bounce-in animation restarts each time
+  overlay.classList.add("visible");
+
+  setTimeout(() => {
+    overlay.classList.add("fading");
+    setTimeout(() => {
+      overlay.classList.remove("visible", "fading");
+      overlay.classList.add("hidden");
+    }, 650);
+  }, 2200);
+}
+
 // Available voices load asynchronously in most browsers, so cache them once
 // ready rather than querying getVoices() fresh (and often empty) every call.
 let cachedVoices = [];
@@ -257,7 +282,7 @@ function playBuzzer(onDone) {
 
 function renderTopNav() {
   const stage = stageForCompletedCount(state.completedDays.length);
-  document.getElementById("home-shiba-emoji").textContent = stage.emoji;
+  document.getElementById("home-shiba-emoji").src = stage.image;
   document.getElementById("home-shiba-name").textContent = state.shibaName || "";
   document.getElementById("streak-count").textContent = `${state.streak} day streak`;
 
@@ -285,7 +310,7 @@ function renderNameSection() {
 
 function renderDashboard() {
   const stage = stageForCompletedCount(state.completedDays.length);
-  document.getElementById("shiba-stage").textContent = stage.emoji;
+  document.getElementById("shiba-stage").src = stage.image;
   document.getElementById("day-progress").textContent =
     `Day ${Math.min(state.currentDay, TOTAL_DAYS)} of ${TOTAL_DAYS} — ${stage.label}`;
 
@@ -482,11 +507,16 @@ function finishQuiz() {
   const stageAfter = stageForCompletedCount(state.completedDays.length);
   document.getElementById("results-score").textContent =
     `You got ${quiz.score}/${quiz.dayData.quiz.length} correct.`;
+  const leveledUp = stageAfter.label !== stageBefore.label;
   const shibaLabel = state.shibaName || "Shiba";
-  document.getElementById("results-growth").textContent =
-    stageAfter.label !== stageBefore.label
-      ? `${shibaLabel} grew into a ${stageAfter.label}! ${stageAfter.emoji}`
-      : `Keep going — ${shibaLabel} is getting closer to its next stage!`;
+  document.getElementById("results-growth").innerHTML = leveledUp
+    ? `${shibaLabel} grew into a ${stageAfter.label}! <img src="${stageAfter.image}" class="inline-shiba-icon" alt="${stageAfter.label}">`
+    : `Keep going — ${shibaLabel} is getting closer to its next stage!`;
+
+  if (leveledUp) {
+    celebrateConfetti();
+    showLevelUpReveal(stageAfter);
+  }
 
   renderResultsReview(quiz.results);
   document.getElementById("btn-repeat-lesson").innerHTML =
