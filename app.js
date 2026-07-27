@@ -215,11 +215,50 @@ function speak(text, onDone) {
   speechSynthesis.speak(utter);
 }
 
+// Short synthesized "wrong answer" buzz — generated with the Web Audio API
+// so no audio file is needed. Reuses one AudioContext across calls.
+let audioCtx = null;
+function playBuzzer(onDone) {
+  const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtxClass) {
+    if (onDone) onDone();
+    return;
+  }
+  if (!audioCtx) audioCtx = new AudioCtxClass();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  // Square wave reads as a duller, more "error tone" buzz than sawtooth's
+  // raspier harmonics, and a low, near-steady pitch avoids the fast-slide
+  // glide that made earlier versions sound like a raspberry.
+  osc.type = "square";
+  osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(85, audioCtx.currentTime + 0.4);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime + 0.28);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.42);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  if (onDone) {
+    let done = false;
+    const finish = () => { if (!done) { done = true; onDone(); } };
+    osc.onended = finish;
+    setTimeout(finish, 650); // safety net in case onended doesn't fire
+  }
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.42);
+}
+
 function renderTopNav() {
   const stage = stageForCompletedCount(state.completedDays.length);
   document.getElementById("home-shiba-emoji").textContent = stage.emoji;
   document.getElementById("home-shiba-name").textContent = state.shibaName || "";
   document.getElementById("streak-count").textContent = `${state.streak} day streak`;
+
+  // No point offering a reset until there's actually progress to reset —
+  // appears once Day 1's quiz has been completed.
+  document.getElementById("btn-start-over").classList.toggle("hidden", state.completedDays.length === 0);
 }
 
 function renderNameSection() {
@@ -342,7 +381,7 @@ function startQuiz(dayData) {
     ...q,
     choices: shuffleArray(q.choices),
   }));
-  quiz = { dayData: { ...dayData, quiz: shuffledQuiz }, index: 0, score: 0 };
+  quiz = { dayData: { ...dayData, quiz: shuffledQuiz }, index: 0, score: 0, results: [] };
   renderQuizQuestion();
   showView("view-quiz");
 }
@@ -351,7 +390,7 @@ function renderQuizQuestion() {
   const q = quiz.dayData.quiz[quiz.index];
   document.getElementById("quiz-progress").textContent =
     `Question ${quiz.index + 1} of ${quiz.dayData.quiz.length}`;
-  document.getElementById("quiz-question").textContent = q.question;
+  document.getElementById("quiz-question").innerHTML = boldQuoted(q.question);
 
   const choicesEl = document.getElementById("quiz-choices");
   choicesEl.innerHTML = "";
@@ -386,6 +425,7 @@ function selectAnswer(btn, choice, answer, questionText) {
   const isCorrect = choice === answer;
   btn.classList.add(isCorrect ? "correct" : "incorrect");
   if (isCorrect) quiz.score++;
+  quiz.results.push({ question: questionText, userAnswer: choice, correctAnswer: answer, isCorrect });
 
   const advance = () => {
     setTimeout(() => {
@@ -398,11 +438,15 @@ function selectAnswer(btn, choice, answer, questionText) {
     }, QUIZ_BEAT_MS);
   };
 
-  const jp = jpForAnswer(choice, questionText);
-  if (jp) {
-    speak(jp, advance); // wait for the actual pronunciation to finish, then beat, then advance
+  if (isCorrect) {
+    const jp = jpForAnswer(choice, questionText);
+    if (jp) {
+      speak(jp, advance); // wait for the actual pronunciation to finish, then beat, then advance
+    } else {
+      advance();
+    }
   } else {
-    advance();
+    playBuzzer(advance); // wrong answer — buzz instead of pronouncing the word
   }
 }
 
@@ -439,10 +483,15 @@ function finishQuiz() {
       ? `${shibaLabel} grew into a ${stageAfter.label}! ${stageAfter.emoji}`
       : `Keep going — ${shibaLabel} is getting closer to its next stage!`;
 
+  renderResultsReview(quiz.results);
+  document.getElementById("btn-repeat-lesson").innerHTML =
+    `<span class="btn-icon">↻</span> Repeat Day ${day}'s Lesson`;
+
   nextLessonDayData = CURRICULUM.find((d) => d.day === state.currentDay);
   const nextBtn = document.getElementById("btn-next-lesson");
   if (nextLessonDayData) {
-    nextBtn.textContent = `Continue to Day ${nextLessonDayData.day}'s Lesson`;
+    nextBtn.innerHTML =
+      `Continue to Day ${nextLessonDayData.day}'s Lesson <span class="btn-icon">▶</span>`;
     nextBtn.classList.remove("hidden");
   } else {
     nextBtn.classList.add("hidden");
@@ -450,6 +499,63 @@ function finishQuiz() {
 
   renderTopNav();
   showView("view-results");
+}
+
+// Bolds the key term in a review question — either the word in single-quotes
+// ("How do you say 'hello'?") or a bare number ("How do you say the number 6?").
+function boldQuoted(text) {
+  return text
+    .replace(/'([^']+)'/, "'<strong>$1</strong>'")
+    .replace(/\b(\d+)\b/, "<strong>$1</strong>");
+}
+
+function renderResultsReview(results) {
+  const container = document.getElementById("results-review");
+  container.innerHTML = "";
+
+  const addAnswerRow = (item, label, text, cls, jp) => {
+    const row = document.createElement("div");
+    row.className = `review-answer-row ${cls}`;
+    row.innerHTML = `
+      <span class="review-answer-text">${label} ${text}</span>
+      <button class="review-speak-btn" aria-label="Play pronunciation">🔊</button>
+    `;
+    if (jp) {
+      row.addEventListener("click", () => {
+        const speakBtn = row.querySelector(".review-speak-btn");
+        speakBtn.classList.add("playing");
+        speak(jp, () => speakBtn.classList.remove("playing"));
+      });
+    } else {
+      row.querySelector(".review-speak-btn").classList.add("hidden");
+      row.style.cursor = "default";
+    }
+    item.appendChild(row);
+  };
+
+  results.forEach((r) => {
+    const item = document.createElement("div");
+    item.className = "review-item";
+
+    const questionEl = document.createElement("p");
+    questionEl.className = "review-question";
+    questionEl.innerHTML = boldQuoted(r.question);
+    item.appendChild(questionEl);
+
+    if (r.isCorrect) {
+      addAnswerRow(item, "✓", r.correctAnswer, "correct", jpForAnswer(r.correctAnswer, r.question));
+    } else {
+      // The wrong row only gets a sound if it's genuinely its own distinct
+      // Japanese word (a "How do you say X?" choice) — not a fallback to the
+      // question's target word, which would make it play the same audio as
+      // the correct answer (e.g. on "What does 'X' mean?" questions, where
+      // wrong choices are just English meanings with no Japanese of their own).
+      addAnswerRow(item, "✗ Your answer:", r.userAnswer, "incorrect", ROMAJI_TO_JP[r.userAnswer] || null);
+      addAnswerRow(item, "✓", r.correctAnswer, "correct", jpForAnswer(r.correctAnswer, r.question));
+    }
+
+    container.appendChild(item);
+  });
 }
 
 document.getElementById("btn-home").addEventListener("click", () => {
@@ -509,6 +615,14 @@ document.getElementById("btn-repeat-lesson").addEventListener("click", () => {
 document.getElementById("btn-to-dashboard").addEventListener("click", () => {
   renderDashboard();
   showView("view-dashboard");
+});
+
+document.getElementById("btn-start-over").addEventListener("click", (e) => {
+  e.preventDefault();
+  const sure = confirm("This will erase all progress (streak, points, and your Shiba's name) and start over from the welcome screen. Are you sure?");
+  if (!sure) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
 });
 
 renderDashboard();

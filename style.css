@@ -216,6 +216,7 @@ button {
   background: #e07a3f;
   color: white;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent; /* avoid the native tap flash sticking around on mobile */
 }
 
 button:disabled { background: #d9c6b8; cursor: default; }
@@ -231,6 +232,24 @@ button:disabled { background: #d9c6b8; cursor: default; }
   color: #8a7a6d;
   text-align: center;
   margin: 0 0 8px;
+}
+
+.text-link {
+  display: block;
+  text-align: center;
+  margin-top: 24px;
+  font-size: 13px;
+  color: #a89484;
+  text-decoration: underline;
+}
+
+.text-link:hover { color: #8a7a6d; }
+
+#app-version {
+  text-align: center;
+  font-size: 11px;
+  color: #c8b8a8;
+  margin: 10px 0 0;
 }
 
 .practice-btn {
@@ -293,7 +312,12 @@ button:disabled { background: #d9c6b8; cursor: default; }
   border: 2px solid #f0d9c4;
 }
 
-.choice-btn:hover { background: #fdeee0; }
+@media (hover: hover) {
+  /* Only apply hover on devices with real pointer hover — on touch
+     screens this can otherwise get "stuck" and appear on whatever new
+     button happens to render at the same spot afterward. */
+  .choice-btn:hover { background: #fdeee0; }
+}
 
 .choice-btn.correct {
   background: #c8e6c9;
@@ -310,4 +334,83 @@ button:disabled { background: #d9c6b8; cursor: default; }
 #results-score, #results-growth {
   text-align: center;
   font-size: 16px;
+}
+
+#results-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+#results-actions-row button {
+  flex: 1;
+  width: auto;
+  text-align: center;
+  padding-left: 10px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+@media (hover: hover) {
+  #results-actions-row button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.btn-icon { font-size: 13px; }
+
+#results-review {
+  margin-top: 16px;
+}
+
+.review-item {
+  background: white;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.review-question {
+  font-size: 14px;
+  color: #3a2e28;
+  margin: 0 0 8px;
+}
+
+.review-answer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-top: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.review-answer-row:active { transform: scale(0.98); }
+.review-answer-row.correct { background: #eaf6ea; }
+.review-answer-row.incorrect { background: #fdeaea; }
+
+.review-answer-text { font-size: 14px; }
+.review-answer-row.correct .review-answer-text { color: #1b5e20; font-weight: 700; }
+.review-answer-row.incorrect .review-answer-text { color: #b71c1c; }
+
+.review-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  margin: 0 0 0 8px;
+  border-radius: 50%;
+  background: white;
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.review-speak-btn.playing {
+  background: #66bb6a;
+  transform: scale(1.1);
 }
